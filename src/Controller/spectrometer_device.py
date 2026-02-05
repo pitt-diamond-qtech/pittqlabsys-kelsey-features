@@ -41,11 +41,11 @@ from src.core import Device, Parameter
 ACK_CHARS = b'+-='
 DONE_CHAR = b'*'
 
-# Some conservative defaults/timeouts (seconds)
+# Timeouts (seconds)
 _DEFAULT_READ_TIMEOUT = 5.0
 _DEFAULT_ACK_TIMEOUT = 5.0
 _DEFAULT_DONE_TIMEOUT = 120.0
-_IDLE_GAP = 2.0  # stop reading if idle for this long
+_IDLE_GAP = 2.0 
 
 class Spectrometer(Device):
     """
@@ -58,17 +58,15 @@ class Spectrometer(Device):
         Parameter('com_port', 5, list(range(1, 100)), 'COM port number (e.g., 5 for COM5)'),
         Parameter('read_timeout_s', _DEFAULT_READ_TIMEOUT, float, 'serial read timeout (s)'),
 
-        # Commonly tweaked instrument state
         Parameter('grating', 1, list(range(1, 10)), 'active grating index (1..N)'),
         Parameter('wavelength_nm', 600.0, float, 'current wavelength (nm)'),
     ])
 
-    # ---- lifecycle ---------------------------------------------------------
 
     def __init__(self, name=None, settings=None):
         self._ser = None
         super(Spectrometer, self).__init__(name, settings)
-        self._last_qm_cache: str = ""   # retain last QM for parsing probes that derive from it
+        self._last_qm_cache: str = ""  
 
     def _connect(self) -> int:
         if self.settings['connection_type'] != 'COM':
@@ -116,7 +114,6 @@ class Spectrometer(Device):
     def is_connected(self) -> bool:
         return bool(self._ser and self._ser.is_open)
 
-    # ---- command plumbing --------------------------------------------------
 
     def _monotonic(self) -> float:
         return time.monotonic()
@@ -186,7 +183,7 @@ class Spectrometer(Device):
         self._write_line('!')
         self._read_until_any(DONE_CHAR, timeout=done_timeout)
 
-    # ---- high-level operations --------------------------------------------
+    # high-level operations
 
     def reset(self) -> str:
         resp = self._send_command_collect("RE", wait=0.2, timeout=max(5.0, self.settings['read_timeout_s']))
@@ -204,7 +201,7 @@ class Spectrometer(Device):
         self._last_qm_cache = resp
         return resp
 
-    # Typed helpers
+    # helpers
 
     def get_wavelength(self) -> float:
         text = self.query_state()
@@ -294,12 +291,10 @@ class Spectrometer(Device):
             if not (lo <= value_nm <= hi):
                 raise ValueError(f"Wavelength {value_nm:.2f} nm out of range for grating {gr} "
                                  f"(allowed {lo:.2f}–{hi:.2f} nm)")
-        # Execute GW flow
         self._ser.reset_input_buffer()
         self._write_line(f"GW {value_nm:.2f}")
         self._commit_with_ack_done()
         print("[INFO] Wavelength changed.")
-        # Sync cached setting + read back
         self.settings['wavelength_nm'] = float(value_nm)
         self._last_qm_cache = ""
         time.sleep(0.2)
@@ -354,7 +349,7 @@ class Spectrometer(Device):
         if param == "state block":
             return "QM"
         elif param in ("current wavelength", "current grating", "gratings", "grating limits"):
-            return "QM"  # all derived from QM
+            return "QM" 
         else:
             raise KeyError(f"Unknown probe '{param}'")
 
@@ -366,7 +361,7 @@ class Spectrometer(Device):
         assert key in self._PROBES.keys()
         cmd = self._param_to_internal(key)
         if cmd == "QM":
-            text = self.query_state()  # refresh cache
+            text = self.query_state() 
             if key == "state block":
                 return text
             if key == "current wavelength":
@@ -378,8 +373,6 @@ class Spectrometer(Device):
             if key == "grating limits":
                 return self.get_grating_limits()
         raise KeyError(f"Unhandled probe '{key}'")
-
-    # ---- convenience teardown ---------------------------------------------
 
     def close(self):
         if self._ser and self._ser.is_open:
