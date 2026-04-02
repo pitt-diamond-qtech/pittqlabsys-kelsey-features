@@ -1,0 +1,253 @@
+;******************************************************************************
+; SBIG Camera Driver INF File
+; Copyright (c) Santa Barbara Instrument Group.  All rights reserved.
+;
+; 2011-01-20
+; Second Release for 64 Bit Windows for users with newer ST-7 cameras
+; with Remote Guide Head capability.
+;
+; This file supports:
+;     Windows XP x64 Edition
+;     Windows Server 2003 x64 Edition
+;     Windows Vista x64 Edition
+;
+; Utilizes the Version 2.41 Driver (sbigu64.sys) to boot the cameras
+; from a Dot Hex file and then after renumeration to communicate with
+; the camera.  Only the Kernel level drivers is installed by this INF.
+; All the other files are installed by the DriverChecker.
+;------------------------------------------------------------------------------
+
+;******************************************************************************
+; Version section
+;------------------------------------------------------------------------------
+[Version]
+Signature="$Windows NT$"
+Provider=%S_Provider%
+DriverVer=01/20/2011,2.41.0.2
+
+; This specifies the .cat file provided by WHQL if the driver is certified.
+CatalogFile=sbigu64p.cat
+
+Class=SBIGUSBDevices
+ClassGUID={E5E3F357-202B-40ea-8693-806E61F164B7}
+
+;******************************************************************************
+; Class Install section
+;------------------------------------------------------------------------------
+[ClassInstall32] 
+AddReg=_AddReg_ClassInstall
+
+[_AddReg_ClassInstall]
+HKR,,,,"%S_DeviceClassDisplayName%"
+HKR,,Icon,,"-20"
+
+
+;******************************************************************************
+; Manufacturer section
+;------------------------------------------------------------------------------
+[Manufacturer]
+%S_Mfg%=_Models, ntamd64
+
+
+;******************************************************************************
+; Models section
+; This section specifies the device's hardware ID.
+;------------------------------------------------------------------------------
+; x64-based systems
+[_Models.ntamd64]
+%S_DeviceDescSTR2NF%=_InstallSTR2, USB\Vid_0d97&Pid_0001
+%S_DeviceDescSTLNF%=_InstallSTL, USB\Vid_0d97&Pid_0002
+%S_DeviceDescSTFNF%=_InstallSTF, USB\Vid_0d97&Pid_0003
+%S_DeviceDescCOMM%=_InstallCOMM, USB\Vid_0d97&Pid_0101
+%S_DeviceDescCOMM2%=_InstallCOMM2, USB\Vid_0d97&Pid_0102
+
+
+;******************************************************************************
+; Install sections x64-based systems
+;------------------------------------------------------------------------------
+[_InstallSTR1.ntamd64]
+CopyFiles=_CopyFiles_sys_x64
+
+[_InstallSTR1.ntamd64.Services]
+AddService = %S_ServiceName_x64%, 0x00000002, _AddService_x64, _EventLog_x64
+
+[_InstallSTR1.ntamd64.HW]
+AddReg=_AddReg_HW
+AddReg=_AddRegSTR1_HW
+
+;
+
+[_InstallSTR2.ntamd64]
+CopyFiles=_CopyFiles_sys_x64
+
+[_InstallSTR2.ntamd64.Services]
+AddService = %S_ServiceName_x64%, 0x00000002, _AddService_x64, _EventLog_x64
+
+[_InstallSTR2.ntamd64.HW]
+AddReg=_AddReg_HW
+AddReg=_AddRegSTR2_HW
+
+;
+
+[_InstallSTL.ntamd64]
+CopyFiles=_CopyFiles_sys_x64
+
+[_InstallSTL.ntamd64.Services]
+AddService = %S_ServiceName_x64%, 0x00000002, _AddService_x64, _EventLog_x64
+
+[_InstallSTL.ntamd64.HW]
+AddReg=_AddReg_HW
+AddReg=_AddRegSTL_HW
+
+;
+
+[_InstallSTF.ntamd64]
+CopyFiles=_CopyFiles_sys_x64
+
+[_InstallSTF.ntamd64.Services]
+AddService = %S_ServiceName_x64%, 0x00000002, _AddService_x64, _EventLog_x64
+
+[_InstallSTF.ntamd64.HW]
+AddReg=_AddReg_HW
+AddReg=_AddRegSTF_HW
+
+;
+
+[_InstallCOMM.ntamd64]
+CopyFiles=_CopyFiles_sys_x64
+
+[_InstallCOMM.ntamd64.Services]
+AddService = %S_ServiceName_x64%, 0x00000002, _AddService_x64, _EventLog_x64
+
+[_InstallCOMM.ntamd64.HW]
+AddReg=_AddReg_HW
+
+;
+
+[_InstallCOMM2.ntamd64]
+CopyFiles=_CopyFiles_sys_x64
+
+[_InstallCOMM2.ntamd64.Services]
+AddService = %S_ServiceName_x64%, 0x00000002, _AddService_x64, _EventLog_x64
+
+[_InstallCOMM2.ntamd64.HW]
+AddReg=_AddReg_HW
+
+;******************************************************************************
+; Add Service sections
+;------------------------------------------------------------------------------
+
+[_AddService_x64]
+ServiceType    = 1                  ; SERVICE_KERNEL_DRIVER
+StartType      = 3                  ; SERVICE_DEMAND_START
+ErrorControl   = 1                  ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %10%\System32\Drivers\%S_DriverName_x64%.sys
+
+[_EventLog_x64]
+AddReg=_EventLog_x64_AddReg
+
+[_EventLog_x64_AddReg]
+HKR,,EventMessageFile,%REG_EXPAND_SZ%,"%%SystemRoot%%\System32\IoLogMsg.dll;%%SystemRoot%%\System32\drivers\%S_DriverName_x64%.sys"
+HKR,,TypesSupported,  %REG_DWORD%,7
+
+
+;******************************************************************************
+; Registry sections
+;------------------------------------------------------------------------------
+[_AddReg_HW]
+HKR,,CleanupWizard_DeviceIdentString,%REG_SZ%,"{DAB6A146-D93E-48ab-B3E5-374AB8FFF277}"
+HKR,,DriverUserInterfaceGuid,%REG_SZ%,"{E316676B-7084-4473-A297-4BAABC2542AA}"
+HKR,,DisableDefaultInterface, %REG_DWORD%, 1
+
+HKR,,PowerStateOnOpen,     %REG_DWORD%, 0
+HKR,,PowerStateOnClose,    %REG_DWORD%, 0
+HKR,,MinPowerStateUsed,    %REG_DWORD%, 3
+HKR,,MinPowerStateUnused,  %REG_DWORD%, 3
+HKR,,EnableRemoteWakeup,   %REG_DWORD%, 0
+HKR,,AbortPipesOnPowerDown,%REG_DWORD%, 1
+HKR,,UnconfigureOnClose,   %REG_DWORD%, 1
+HKR,,ResetDeviceOnClose,   %REG_DWORD%, 0
+HKR,,MaxIsoPackets,        %REG_DWORD%, 512
+HKR,,ShortTransferOk,      %REG_DWORD%, 1
+HKR,,RequestTimeout,       %REG_DWORD%, 1000
+HKR,,SuppressPnPRemoveDlg, %REG_DWORD%, 1
+
+
+[_AddRegSTR1_HW]
+HKR,,FxFwFile,            %REG_SZ%, "sbigucam.hex"
+HKR,,FxBootloaderCheck,   %REG_DWORD%, 0
+HKR,,FxExtRamBase,        %REG_DWORD%, 0x4000
+
+
+[_AddRegSTR2_HW]
+HKR,,FxFwFile,            %REG_SZ%, "sbigpcam.hex"
+HKR,,FxBootloaderCheck,   %REG_DWORD%, 0
+HKR,,FxExtRamBase,        %REG_DWORD%, 0x4000
+
+
+[_AddRegSTL_HW]
+HKR,,FxFwFile,            %REG_SZ%, "sbiglcam.hex"
+HKR,,FxBootloaderCheck,   %REG_DWORD%, 0
+HKR,,FxExtRamBase,        %REG_DWORD%, 0x4000
+
+
+[_AddRegSTF_HW]
+HKR,,FxFwFile,            %REG_SZ%, "sbigfcam.hex"
+HKR,,FxBootloaderCheck,   %REG_DWORD%, 0
+HKR,,FxExtRamBase,        %REG_DWORD%, 0x4000
+
+
+;******************************************************************************
+; Copy Files section
+;------------------------------------------------------------------------------
+[_CopyFiles_sys_x64]
+sbigu64.sys
+
+
+;******************************************************************************
+; Destination Directories
+;------------------------------------------------------------------------------
+[DestinationDirs]
+DefaultDestDir =     12   ; %windir%\system32\drivers 
+_CopyFiles_sys_x64 = 12
+
+
+;******************************************************************************
+; Disk Layout
+;------------------------------------------------------------------------------
+[SourceDisksNames.amd64]
+1=%S_DiskName%,,
+
+[SourceDisksFiles.amd64]
+sbigu64.sys=1
+
+
+;******************************************************************************
+; Text Strings
+;------------------------------------------------------------------------------
+[Strings]
+;
+; Non-Localizable Strings, DO NOT MODIFY!
+;
+REG_SZ         = 0x00000000
+REG_MULTI_SZ   = 0x00010000
+REG_EXPAND_SZ  = 0x00020000
+REG_BINARY     = 0x00000001
+REG_DWORD      = 0x00010001
+
+
+S_Provider="SBIG"
+S_Mfg="SBIG"
+S_DeviceClassDisplayName="SBIG USB Devices"
+S_DeviceDescSTR1NF="SBIG ST Classic Camera Without Firmware"
+S_DeviceDescSTR2NF="SBIG ST Pro Camera Without Firmware"
+S_DeviceDescSTLNF="SBIG STL Camera Without Firmware"
+S_DeviceDescSTFNF="SBIG ST-402 Camera Without Firmware"
+S_DeviceDescCOMM="SBIG USB Camera With Firmware"
+S_DeviceDescCOMM2="SBIG USB-64 Camera With Firmware"
+S_DiskName="SBIGU64 Driver Disk"
+S_ServiceName_x64="sbigu64"
+S_DriverName_x64="sbigu64"
+
+
+; *** EOF ***

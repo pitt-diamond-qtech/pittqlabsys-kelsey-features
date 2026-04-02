@@ -55,7 +55,7 @@ class Spectrometer(Device):
     _DEFAULT_SETTINGS = Parameter([
         # Connection
         Parameter('connection_type', 'COM', ['COM'], 'connection type (COM only)'),
-        Parameter('com_port', 5, list(range(1, 100)), 'COM port number (e.g., 5 for COM5)'),
+        Parameter('com_port', 6, list(range(1, 100)), 'COM port number (e.g., 5 for COM5)'),
         Parameter('read_timeout_s', _DEFAULT_READ_TIMEOUT, float, 'serial read timeout (s)'),
 
         Parameter('grating', 1, list(range(1, 10)), 'active grating index (1..N)'),
@@ -384,15 +384,15 @@ class Spectrometer(Device):
 if __name__ == "__main__":
     dev = Spectrometer(settings={
         'connection_type': 'COM',
-        'com_port': 5,
+        'com_port': 6,
         'read_timeout_s': 5.0,
     })
 
     #print(dev.read_probes("state block"))
     print("Current Wavelength (nm):", dev.read_probes("current wavelength"))
-    print("Current Grating:", dev.read_probes("current grating"))
-    print("Gratings:", dev.read_probes("gratings"))
+    #print("Current Grating:", dev.read_probes("current grating"))
+    #print("Gratings:",0 dev.read_probes("gratings"))
     #dev.set_grating(2)
-    #dev.set_wavelength(650.0)
-    #dev.set_entrance_slit(30)
+    #dev.set_wavelength(630)
+    #dev.set_entrance_slit(2000)
     dev.close()
