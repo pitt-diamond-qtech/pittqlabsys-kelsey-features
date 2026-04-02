@@ -9,7 +9,7 @@ import sys, pathlib
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
-from src.core import Device
+from src.core import Device, Parameter
 
 
 class SBIGError(RuntimeError):
@@ -24,7 +24,19 @@ class SBIGCamera(Device):
     Features:
       - Full-quality single exposure: capture(exposure_ms)
       - Live mode: start_live(), get_image_fast(), stop_live()
+
+    
+    Minimal SBIG Camera device with probes:
+        - gain
+        - integration_time_ms
+        - capture
     """
+
+    _DEFAULT_SETTINGS = Parameter([
+        Parameter("dll_path", "SBIGUDrv.dll", str, "Path to SBIG DLL"),
+        Parameter("integration_time_ms", 100.0, float, "Exposure time", units="ms"),
+        Parameter("gain", 0, int, "Camera gain"),
+    ])
 
     # ---- Command constants (from sbigudrv.h) ----
     CC_START_EXPOSURE         = 1
@@ -84,10 +96,17 @@ class SBIGCamera(Device):
     EXP_RIPPLE_CORRECTION     = 0x02000000
     EXP_TIME_MASK             = 0x00FFFFFF
 
-    def __init__(self, dll_path: str = "SBIGUDrv.dll"):
+    def __init__(self, dll_path: str = "SBIGUDrv.dll", name=None, settings=None):
         """
         Initialize the camera, load the DLL, open driver/device, and establish link.
         """
+
+        super().__init__(name, settings)
+        if (settings):
+            dll_path = self.settings["dll_path"]
+        else:
+            dll_path
+
         # Load DLL
         self._dll = ctypes.WinDLL(dll_path)
 
@@ -117,8 +136,16 @@ class SBIGCamera(Device):
         self._get_ccd_info()
 
         # software-tracked
-        self._gain = 0
-        self._integration_time_ms: float = 0.0 #default 0 seconds
+        self._gain = self.settings["gain"]
+        self._integration_time_ms = self.settings["integration_time_ms"]
+
+    @property
+    def probes(self):
+        return {
+            "gain": self.get_gain,
+            "integration_time_ms": self.get_integration_time,
+            "capture": self.capture,
+        }
 
     # =========================
     # Low-level helpers
@@ -337,6 +364,7 @@ class SBIGCamera(Device):
         err = self._cmd(self.CC_USB_AD_CONTROL, params, None)
         self._check(err, "set_gain")
         self._gain = int(gain)
+        self.settings["gain"] = int(gain)
 
     def get_gain(self) -> int:
         """
@@ -359,6 +387,7 @@ class SBIGCamera(Device):
         if exposure_ms <= 0:
             raise ValueError("exposure_ms must be > 0")
         self._integration_time_ms = float(exposure_ms)
+        self.settings["integration_time_ms"] = float(exposure_ms)
 
     def get_integration_time(self) -> float:
         """
@@ -525,7 +554,7 @@ if __name__ == "__main__":
     cam = SBIGCamera(r"C:\Users\duttlab\Desktop\pittqlabsys-kelsey-features\src\Controller\binary_files\sbigu64p\SBIGUDrv.dll")  # uses "SBIGUDrv.dll" from current dir / PATH
 
     cam.set_integration_time(100)
-    print("Integration time:", cam.get_integration_time(), "ms")
+    print("Integration time:", cam.probes["integration_time_ms"](), "ms")
 
 
     #try:
@@ -541,19 +570,9 @@ if __name__ == "__main__":
         #plt.colorbar()
         #plt.title("SBIG test exposure")
         #plt.show()
-
-        #print("Gain before:", cam.get_gain())
-        #cam.set_gain(4)
-        #print("Gain after:", cam.get_gain())
-        #img2 = cam.capture()
-        #print("Image shape:", img2.shape, "dtype:", img2.dtype)
-       # plt.imshow(img, cmap="gray")
-        #plt.colorbar()
-        #plt.title("SBIG test exposure")
-       # plt.show()
-
     try:
         cam.set_gain(2)
+        print("Gain:", cam.probes["gain"]())
         cam.start_live(exposure_ms=100)
         print("Live mode started...")
         plt.ion()
