@@ -96,16 +96,13 @@ class SBIGCamera(Device):
     EXP_RIPPLE_CORRECTION     = 0x02000000
     EXP_TIME_MASK             = 0x00FFFFFF
 
-    def __init__(self, dll_path: str = "SBIGUDrv.dll", name=None, settings=None):
+    def __init__(self, name: Optional[str] = None, settings=None):
         """
         Initialize the camera, load the DLL, open driver/device, and establish link.
         """
-
-        super().__init__(name, settings)
-        if (settings):
-            dll_path = self.settings["dll_path"]
-        else:
-            dll_path
+        settings = settings or {}
+    
+        dll_path = settings.get("dll_path", "SBIGUDrv.dll")
 
         # Load DLL
         self._dll = ctypes.WinDLL(dll_path)
@@ -118,6 +115,8 @@ class SBIGCamera(Device):
         ]
         self._dll.SBIGUnivDrvCommand.restype = ctypes.c_short
 
+        super().__init__(name, settings)
+
         # camera geometry (will be filled by _get_ccd_info)
         self.width: int = 1600
         self.height: int = 1200
@@ -129,6 +128,8 @@ class SBIGCamera(Device):
         self._live_frame: Optional[np.ndarray] = None
         self._live_lock = threading.Lock()
 
+        self._is_connected: bool = False
+
         # ---- do the low-level init ----
         self._open_driver()
         self._open_device_usb()
@@ -139,12 +140,39 @@ class SBIGCamera(Device):
         self._gain = self.settings["gain"]
         self._integration_time_ms = self.settings["integration_time_ms"]
 
+        if self._gain != 0:
+            self.set_gain(self._gain)
+
     @property
-    def probes(self):
+    def is_connected(self) -> bool:
+        """Return Ture if the camera link has been successfully established."""
+        return self._is_connected
+    
+    def update(self, settings: dict) -> None:
+        """Apply a directory of settings to the device."""
+        for key, value in settings.items():
+            if key == "gain":
+                self.set_gain(int(value))
+            elif key == "integration_time_ms":
+                self.set_integration_time(float(value))
+
+    def read_probes(self,key: str):
+        """"Return the current value of a named probe."""
+        if key == "gain":
+            return self.get_gain()
+        elif key == "integration_time_ms":
+            return self.get_integration_time()
+        elif key == "image":
+            return self.capture()
+        else:
+            raise KeyError(f"Unknown probe {key}. Valid probes: {list(self._PROBES)}")
+        
+    @property 
+    def probes(self) -> dict:
         return {
             "gain": self.get_gain,
             "integration_time_ms": self.get_integration_time,
-            "capture": self.capture,
+            "image": self.capture,
         }
 
     # =========================
@@ -168,7 +196,7 @@ class SBIGCamera(Device):
         err = self._dll.SBIGUnivDrvCommand(ctypes.c_short(cmd), p_params, p_results)
         return int(err)
 
-    def _check(self, err: int, where: str = ""):
+    def _check(self, err: int, where: str = "") -> None:
         if err != self.CE_NO_ERROR:
             raise SBIGError(f"SBIG error {err} in {where}")
 
@@ -277,6 +305,7 @@ class SBIGCamera(Device):
         results = self._EstablishLinkResults()
         err = self._cmd(self.CC_ESTABLISH_LINK, params, results)
         self._check(err, "ESTABLISH_LINK")
+        self._is_connected = True
 
         # cameraType is available as results.cameraType
         # (e.g. ST-2K = 14)
@@ -324,7 +353,7 @@ class SBIGCamera(Device):
     # =========================
     # Public API
     # =========================
-    def close(self):
+    def close(self) -> None:
         """Close device and driver and unload resources."""
         try:
             self.stop_live()
@@ -343,10 +372,12 @@ class SBIGCamera(Device):
         except Exception:
             pass
 
+        self._is_connected = False
+
     def __enter__(self):
         return self
 
-    def __exit__(self, exc_type, exc, tb):
+    def __exit__(self, exc_type, exc_val,exc_tb):
         self.close()
 
     # =========================
@@ -549,36 +580,24 @@ class SBIGCamera(Device):
         self._live_thread = None
 
 if __name__ == "__main__":
-    # If your DLL is not on PATH, give the full path here:
-    # cam = SBIGCamera(r"E:\ultra_usb_drive\software_by_our_lab\testing\sbig_st2000xm_camera\SBIGUDrv.dll")
-    cam = SBIGCamera(r"C:\Users\duttlab\Desktop\pittqlabsys-kelsey-features\src\Controller\binary_files\sbigu64p\SBIGUDrv.dll")  # uses "SBIGUDrv.dll" from current dir / PATH
-
-    cam.set_integration_time(100)
-    print("Integration time:", cam.probes["integration_time_ms"](), "ms")
+    DLL_PATH = (
+            r"C:\Users\duttlab\Desktop\pittqlabsys-kelsey-features\src\Controller\binary_files\sbigu64p\SBIGUDrv.dll")
 
 
-    #try:
-        #print("Gain before:", cam.get_gain())
-        #cam.set_gain(2)
-        #print("Gain after:", cam.get_gain())
-        #times_ms, intens_up, intens_down = cam.measure_hysteresis()
+    with SBIGCamera(settings={"dll_path": DLL_PATH,
+                              "integration_time_ms": 100.0,
+                              "gain": 2}) as cam:
+        print("Connected:", cam.is_connected)
+        print("Gain:", cam.read_probes("gain"))
+        print("Integration time:", cam.read_probes("integration_time_ms"), "ms")
+        print("CCD Geometry:", cam.width, "x", cam.height)
 
-        #print("Taking ", cam.get_integration_time(), " exposure...")
-        #img = cam.capture()
-        #print("Image shape:", img.shape, "dtype:", img.dtype)
-        #plt.imshow(img, cmap=None)
-        #plt.colorbar()
-        #plt.title("SBIG test exposure")
-        #plt.show()
-    try:
-        cam.set_gain(2)
-        print("Gain:", cam.probes["gain"]())
         cam.start_live(exposure_ms=100)
-        print("Live mode started...")
+        print("Live mode started. Close the plot window to stop.")
+
         plt.ion()
         fig, ax = plt.subplots()
         im = None
-
 
         while plt.fignum_exists(fig.number):
             frame = cam.get_image_fast()
@@ -607,6 +626,4 @@ if __name__ == "__main__":
 
         plt.ioff()
         plt.show()
-
-    finally:
-        cam.close()
+        print("Done.")
