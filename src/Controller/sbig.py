@@ -100,9 +100,10 @@ class SBIGCamera(Device):
         """
         Initialize the camera, load the DLL, open driver/device, and establish link.
         """
-        settings = settings or {}
-    
-        dll_path = settings.get("dll_path", "SBIGUDrv.dll")
+        if isinstance(settings, dict):
+            dll_path = settings.get("dll_path", "SBIGUDrv.dll")
+        else:
+            dll_path = "SBIGDrv.dll"
 
         # Load DLL
         self._dll = ctypes.WinDLL(dll_path)
@@ -152,9 +153,13 @@ class SBIGCamera(Device):
         """Apply a directory of settings to the device."""
         for key, value in settings.items():
             if key == "gain":
-                self.set_gain(int(value))
+                if self._is_connected:
+                    self.set_gain(int(value))
+                else:
+                    self._gain = int(value)
             elif key == "integration_time_ms":
-                self.set_integration_time(float(value))
+                self._integration_time_ms = float(value)
+                self.settings["integration_time_ms"] = float(value)
 
     def read_probes(self,key: str):
         """"Return the current value of a named probe."""
