@@ -2,7 +2,7 @@ import ctypes
 import threading
 import time
 from typing import Optional
-
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import sys, pathlib
@@ -100,13 +100,35 @@ class SBIGCamera(Device):
         """
         Initialize the camera, load the DLL, open driver/device, and establish link.
         """
+        self._dll = None
+        self._is_connected: bool = False
+        self._gain: int =0
+        self._integration_time_ms: float = 100.0
+        self.width: int = 1600
+        self.height: int = 1200
+        self._live_thread: Optional[threading.Thread] = None
+        self._live_running: bool = False
+        self._live_exposure_ms: float = 200.0
+        self._live_frame: Optional[np.ndarray] = None
+        self._live_lock = threading.Lock()
+
         if isinstance(settings, dict):
-            dll_path = settings.get("dll_path", "SBIGUDrv.dll")
+            self._dll_path = settings.get("dll_path", "SBIGUDrv.dll")
         else:
-            dll_path = "SBIGDrv.dll"
+            self._dll_path = "SBIGUDrv.dll"
+
+        super().__init__(name, settings)
+
+    def _connect(self) -> int:
+        dll_path = pathlib.Path(self._dll_path).resolve()
+
+        if not dll_path.exists():
+            raise FileNotFoundError(f"SBIGUdrv.dll not found at {dll_path}") 
+        
+        os.add_dll_directory(str(dll_path.parent))
 
         # Load DLL
-        self._dll = ctypes.WinDLL(dll_path)
+        self._dll = ctypes.WinDLL(str(dll_path))
 
         # Configure function signature: short SBIGUnivDrvCommand(short, void*, void*)
         self._dll.SBIGUnivDrvCommand.argtypes = [
@@ -115,23 +137,6 @@ class SBIGCamera(Device):
             ctypes.c_void_p,
         ]
         self._dll.SBIGUnivDrvCommand.restype = ctypes.c_short
-
-        super().__init__(name, settings)
-
-        # camera geometry (will be filled by _get_ccd_info)
-        self.width: int = 1600
-        self.height: int = 1200
-
-        # live mode state
-        self._live_thread: Optional[threading.Thread] = None
-        self._live_running: bool = False
-        self._live_exposure_ms: float = 200.0
-        self._live_frame: Optional[np.ndarray] = None
-        self._live_lock = threading.Lock()
-
-        self._is_connected: bool = False
-
-        # ---- do the low-level init ----
         self._open_driver()
         self._open_device_usb()
         self._establish_link()
@@ -143,6 +148,7 @@ class SBIGCamera(Device):
 
         if self._gain != 0:
             self.set_gain(self._gain)
+        return 0
 
     @property
     def is_connected(self) -> bool:
@@ -153,13 +159,14 @@ class SBIGCamera(Device):
         """Apply a directory of settings to the device."""
         for key, value in settings.items():
             if key == "gain":
-                if self._is_connected:
+                if self._is_connected and self._dll is not None:
                     self.set_gain(int(value))
                 else:
                     self._gain = int(value)
             elif key == "integration_time_ms":
                 self._integration_time_ms = float(value)
-                self.settings["integration_time_ms"] = float(value)
+                if hasattr(self, 'settings') and self.settings is not None:
+                    self.settings["integration_time_ms"] = float(value)
 
     def read_probes(self,key: str):
         """"Return the current value of a named probe."""
@@ -173,11 +180,11 @@ class SBIGCamera(Device):
             raise KeyError(f"Unknown probe {key}. Valid probes: {list(self._PROBES)}")
         
     @property 
-    def probes(self) -> dict:
+    def _PROBES(self) -> dict:
         return {
-            "gain": self.get_gain,
-            "integration_time_ms": self.get_integration_time,
-            "image": self.capture,
+            "gain": "Last gain value written to the camera",
+            "integration_time_ms": "Current exposure time in milliseconds",
+            "image": "Single captured fram as uint16 ndarray",
         }
 
     # =========================
@@ -588,10 +595,11 @@ if __name__ == "__main__":
     DLL_PATH = (
             r"C:\Users\duttlab\Desktop\pittqlabsys-kelsey-features\src\Controller\binary_files\sbigu64p\SBIGUDrv.dll")
 
-
-    with SBIGCamera(settings={"dll_path": DLL_PATH,
+    cam = SBIGCamera(settings={"dll_path": DLL_PATH,
                               "integration_time_ms": 100.0,
-                              "gain": 2}) as cam:
+                              "gain": 2})
+    cam._connect()
+    try:
         print("Connected:", cam.is_connected)
         print("Gain:", cam.read_probes("gain"))
         print("Integration time:", cam.read_probes("integration_time_ms"), "ms")
@@ -632,3 +640,5 @@ if __name__ == "__main__":
         plt.ioff()
         plt.show()
         print("Done.")
+    finally:
+        cam.close()
