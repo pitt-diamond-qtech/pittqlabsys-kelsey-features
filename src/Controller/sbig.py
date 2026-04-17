@@ -34,8 +34,8 @@ class SBIGCamera(Device):
 
     _DEFAULT_SETTINGS = Parameter([
         Parameter("dll_path", "SBIGUDrv.dll", str, "Path to SBIG DLL"),
-        Parameter("integration_time_ms", 100.0, float, "Exposure time", units="ms"),
-        Parameter("gain", 0, int, "Camera gain"),
+        Parameter("integration_time_ms", 100.0, float, "Exposure time", units="ms", min_value=0, max_value=2000.0),
+        Parameter("gain", 0, int, "Camera gain", min_value=0, max_value=10),
     ])
 
     # ---- Command constants (from sbigudrv.h) ----
@@ -96,7 +96,7 @@ class SBIGCamera(Device):
     EXP_RIPPLE_CORRECTION     = 0x02000000
     EXP_TIME_MASK             = 0x00FFFFFF
 
-    def __init__(self, name: Optional[str] = None, settings=None):
+    def __init__(self, name=None, settings=None):
         """
         Initialize the camera, load the DLL, open driver/device, and establish link.
         """
@@ -157,6 +157,8 @@ class SBIGCamera(Device):
     
     def update(self, settings: dict) -> None:
         """Apply a directory of settings to the device."""
+
+        super(SBIGCamera, self).update(settings)
         for key, value in settings.items():
             if key == "gain":
                 if self._is_connected and self._dll is not None:

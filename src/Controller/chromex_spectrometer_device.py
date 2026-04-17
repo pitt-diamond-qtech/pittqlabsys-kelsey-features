@@ -55,12 +55,20 @@ class Spectrometer(Device):
     _DEFAULT_SETTINGS = Parameter([
         # Connection
         Parameter('connection_type', 'COM', ['COM'], 'connection type (COM only)'),
-        Parameter('com_port', 6, list(range(1, 100)), 'COM port number (e.g., 5 for COM5)'),
-        Parameter('read_timeout_s', _DEFAULT_READ_TIMEOUT, float, 'serial read timeout (s)'),
+        Parameter('com_port', 6, list(range(1, 10)), 'COM port number (e.g., 5 for COM5)'),
+        Parameter('read_timeout_s', _DEFAULT_READ_TIMEOUT, float, 'serial read timeout (s)', min_value=0.0, max_value=120.0),
 
-        Parameter('grating', 1, list(range(1, 10)), 'active grating index (1..N)'),
-        Parameter('wavelength_nm', 600.0, float, 'current wavelength (nm)'),
+        Parameter('grating', 1, list(range(1, 4)), 'active grating index (1..N)'),
+        Parameter('wavelength_nm', 600.0, float, 'current wavelength (nm)/(μm for Grating 3)', min_value=0, max_value=15000),
     ])
+
+    # _PROBES = {
+    #     "state block": "Raw QM text block",
+    #     "current wavelength": "Wavelength in nm (float)",
+    #     "current grating": "Active grating index (int)",
+    #     "gratings": "List of grating descriptions",
+    #     "grating limits": "Dict {gr_index: (min_nm, max_nm)}",
+    # }
 
 
     def __init__(self, name=None, settings=None):
@@ -88,27 +96,60 @@ class Spectrometer(Device):
         print(f"Spectrometer connected on {port} @ 9600 8N1 (nm, integer grating).")
         time.sleep(1.0)  # allow controller to settle
         return 0
+    
+    """def update(self, settings):
+        super(Agilent8596E, self).update(settings)
+        for key, value in settings.items():
+            if key == 'connection_type':
+                self._connect()
+            elif not (key == 'port' or key == 'GPIB_num'):
+                if self.settings.valid_values[
+                    key] == bool:  # converts booleans, which are more natural to store for on/off, to
+                    value = int(value)  # the integers used internally in the analyzer
+                key = self._param_to_internal_write(key)
+                # only send update to Device if connection to Device has been established
+                if self._settings_initialized:
+                    if key == "VAVG ":
+                        self.agilent_analyzer.write(key + str(value) + ";")
+                    elif key == "ST " :
+                        self.agilent_analyzer.write(key + str(value) + "US;")
+                    else:
+                        self.agilent_analyzer.write(key + str(value) + "MZ;")"""
 
     def update(self, settings: dict):
         """
         Apply runtime changes. Reconnect on COM changes.
         Push instrument-state updates (grating/wavelength) when relevant.
         """
+        if hasattr(self, '_settings_initialized'):
+            old_port = self.settings.get('comp_port')
+            old_connection_type = self.settings.get('connection_type')
+            old_timeout = self.settings.get('read_timeout_s')
+        else:
+            None
+
         super(Spectrometer, self).update(settings)
-        
-        # If connection parameters changed, reconnect
-        if 'connection_type' in settings or 'com_port' in settings or 'read_timeout_s' in settings:
-            # Re-open port with new params
-            if self._ser and self._ser.is_open:
+        connection_changed = (
+            ('com_port' in settings and settings['com_port'] != old_port) or
+            ('connection_type' in settings and settings['connection_type'] != old_connection_type) or
+            ('read_timeout_s' in settings and settings['read_timeout_s'] != old_timeout)
+        )
+
+        if (connection_changed):
+            if self._ser and self.ser.is_open:
                 self._ser.close()
             self._connect()
 
+        if not self.is_connected:
+            return
+
         # If state parameters changed, push them to the instrument (in a safe order)
         # Prefer changing grating first (limits depend on grating), then wavelength.
-        if 'grating' in settings:
+        if 'grating' in settings and settings['grating'] != self.get_grating():
             self.set_grating(int(self.settings['grating']))
-        if 'wavelength_nm' in settings:
+        if 'wavelength_nm' in settings and settings['wavelength_nm'] != self.get_wavelength():
             self.set_wavelength(float(self.settings['wavelength_nm']))
+
 
     @property
     def is_connected(self) -> bool:
@@ -387,12 +428,16 @@ if __name__ == "__main__":
         'com_port': 6,
         'read_timeout_s': 5.0,
     })
+    #dev.update({'wavelength_nm': 620})
+
+    #print(dev.is_connected)
 
     #print(dev.read_probes("state block"))
     print("Current Wavelength (nm):", dev.read_probes("current wavelength"))
     #print("Current Grating:", dev.read_probes("current grating"))
     #print("Gratings:",0 dev.read_probes("gratings"))
     #dev.set_grating(2)
-    #dev.set_wavelength(630)
+    #dev.set_wavelength(632)
     #dev.set_entrance_slit(2000)
+    #dev.reset()
     dev.close()
