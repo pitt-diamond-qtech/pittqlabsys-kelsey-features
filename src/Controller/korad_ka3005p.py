@@ -94,19 +94,43 @@ class korad_ka3005p(Device):
         return 0
 
     def _send_command(self, cmd):
+        self.ser.reset_input_buffer()   # discard any stale/echoed bytes before sending
+        self.ser.write(cmd.encode('ascii'))
+        time.sleep(0.1)                 # KA3005P needs spacing between commands (~50-100ms min)
+
+    def _query(self, cmd, expected_bytes=None, read_timeout=0.5):
+        self.ser.reset_input_buffer()
         self.ser.write(cmd.encode('ascii'))
 
-    def _query(self, cmd):
-        self._send_command(cmd)
-        time.sleep(0.1)
-        response = self.ser.read(self.ser.in_waiting or 1)
-        return response.decode('ascii', errors='ignore').strip()
+        # Poll for data instead of a single blocking read, since the KA3005P
+        # doesn't send a line terminator and response length/timing varies.
+        deadline = time.time() + read_timeout
+        buf = b''
+        while time.time() < deadline:
+            if self.ser.in_waiting:
+                buf += self.ser.read(self.ser.in_waiting)
+                time.sleep(0.02)  # give any trailing bytes a moment to arrive
+                if self.ser.in_waiting == 0:
+                    break
+            else:
+                time.sleep(0.01)
 
-    def _query_raw(self, cmd):
-        # STATUS? returns a single raw status byte, not an ASCII numeric string
-        self._send_command(cmd)
-        time.sleep(0.1)
-        return self.ser.read(self.ser.in_waiting or 1)
+        return buf.decode('ascii', errors='ignore').strip()
+
+    def _query_raw(self, cmd, read_timeout=0.5):
+        self.ser.reset_input_buffer()
+        self.ser.write(cmd.encode('ascii'))
+        deadline = time.time() + read_timeout
+        buf = b''
+        while time.time() < deadline:
+            if self.ser.in_waiting:
+                buf += self.ser.read(self.ser.in_waiting)
+                time.sleep(0.02)
+                if self.ser.in_waiting == 0:
+                    break
+            else:
+                time.sleep(0.01)
+        return buf
 
     def close(self):
         self._send_command("OUT0")  # turn off output before closing
