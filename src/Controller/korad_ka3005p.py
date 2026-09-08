@@ -1,3 +1,7 @@
+import sys, pathlib
+PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 from src.core import Device, Parameter
 import serial
 import time
@@ -112,8 +116,8 @@ class korad_ka3005p(Device):
 
 if __name__ == "__main__":
     dev = korad_ka3005p()
-    dev._query
-    dev._query_raw
+    print(dev.read_probes("idn"))
+    print(dev.read_probes("status"))
     dev.update({"voltage": 5.0, "current": 0.5})
     dev.update({"output_enable": True})
     print(dev.read_probes("voltage_out"))
