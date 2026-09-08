@@ -55,7 +55,7 @@ class korad_ka3005p(Device):
 
     def read_probes(self, key=None):
         assert (
-            self._settings_initialized)  # will cause read_probes to fail if settings (and thus also connection) not yet initialized
+            self._settings_initialized)  # will cause read_probes to fail if settings (and connection) not yet initialized
         assert key in list(self._PROBES.keys())
         key_internal = self._param_to_internal(key)
         if key_internal == "voltage_set":
@@ -94,27 +94,23 @@ class korad_ka3005p(Device):
         return 0
 
     def _send_command(self, cmd):
-        self.ser.reset_input_buffer()   # discard any stale/echoed bytes before sending
+        self.ser.reset_input_buffer()
         self.ser.write(cmd.encode('ascii'))
-        time.sleep(0.1)                 # KA3005P needs spacing between commands (~50-100ms min)
-
+        time.sleep(0.1) 
+                 
     def _query(self, cmd, expected_bytes=None, read_timeout=0.5):
         self.ser.reset_input_buffer()
         self.ser.write(cmd.encode('ascii'))
-
-        # Poll for data instead of a single blocking read, since the KA3005P
-        # doesn't send a line terminator and response length/timing varies.
         deadline = time.time() + read_timeout
         buf = b''
         while time.time() < deadline:
             if self.ser.in_waiting:
                 buf += self.ser.read(self.ser.in_waiting)
-                time.sleep(0.02)  # give any trailing bytes a moment to arrive
+                time.sleep(0.02)
                 if self.ser.in_waiting == 0:
                     break
             else:
                 time.sleep(0.01)
-
         return buf.decode('ascii', errors='ignore').strip()
 
     def _query_raw(self, cmd, read_timeout=0.5):
@@ -144,6 +140,8 @@ if __name__ == "__main__":
     print(dev.read_probes("status"))
     dev.update({"voltage": 5.0, "current": 0.5})
     dev.update({"output_enable": True})
+    print(dev.read_probes("voltage_set"))
+    print(dev.read_probes("current_set"))
     print(dev.read_probes("voltage_out"))
     print(dev.read_probes("current_out"))
     dev.close()
