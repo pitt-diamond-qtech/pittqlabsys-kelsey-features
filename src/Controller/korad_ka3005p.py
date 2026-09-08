@@ -16,7 +16,16 @@ class korad_ka3005p(Device):
         Parameter('current', 0.5, float, 'output current setpoint in A'),
         Parameter('output_enable', False, bool, 'turns the output on/off'),
         Parameter('beep', False, bool, 'turns the beep on/off'),
+        Parameter('recall_memory', 1, int, 'recall panel setting from memory 1-5 (write-only trigger)'),
+        Parameter('save_memory', 1, int, 'save panel setting to memory 1-5 (write-only trigger)'),
         Parameter('ocp', False, bool, 'turns over-current protection on/off'),
+        Parameter('ovp', False, bool, 'turns over-voltage protection on/off'),
+        Parameter('current_display_unit', 'A', str, 'display unit for current: A or MA'),
+        Parameter('analog_control', False, bool, 'enable external analog control of output'),
+        Parameter('ext_switch', False, bool, 'enable external switch (EXON)'),
+        Parameter('ext_compensation', False, bool, 'enable external voltage sense compensation (SENES)'),
+        Parameter('ocp_value', 1.000, float, 'OCP threshold current in A'),
+        Parameter('ovp_value', 30.00, float, 'OVP threshold voltage in V'),
     ])
 
     def __init__(self, name=None, settings=None):
@@ -45,6 +54,31 @@ class korad_ka3005p(Device):
                     self._send_command("BEEP%d" % int(value))
                 elif key == "ocp":
                     self._send_command("OCP%d" % int(value))
+                elif key == "ovp":
+                    self._send_command("OVP%d" % int(value))
+                elif key == "recall_memory":
+                    if not (1 <= int(value) <= 5):
+                        raise ValueError("Memory slot must be 1-5")
+                    self._send_command("RCL%d" % int(value))
+                elif key == "save_memory":
+                    if not (1 <= int(value) <= 5):
+                        raise ValueError("Memory slot must be 1-5")
+                    self._send_command("SAV%d" % int(value))
+                elif key == "current_display_unit":
+                    unit = str(value).upper()
+                    if unit not in ("A", "MA"):
+                        raise ValueError("current_display_unit must be 'A' or 'MA'")
+                    self._send_command("CURRENT %s" % unit)
+                elif key == "analog_control":
+                    self._send_command("ANALOGE%d" % int(value))
+                elif key == "ext_switch":
+                    self._send_command("EXON:%d" % int(value))
+                elif key == "ext_compensation":
+                    self._send_command("SENES:%d" % int(value))
+                elif key == "ocp_value":
+                    self._send_command("OCP1:%.3f" % float(value))
+                elif key == "ovp_value":
+                    self._send_command("OVP1:%05.2f" % float(value)) 
                 elif key in ("port", "baudrate", "timeout"):
                     pass  # handled only at connection time
                 else:
@@ -59,17 +93,25 @@ class korad_ka3005p(Device):
         assert key in list(self._PROBES.keys())
         key_internal = self._param_to_internal(key)
         if key_internal == "voltage_set":
-            value = float(self._query("VSET1?"))
+            value = float(self._query("VSET1?")) #output voltage setting
         elif key_internal == "current_set":
-            value = float(self._query("ISET1?"))
+            value = float(self._query("ISET1?")) #ouput current setting
         elif key_internal == "voltage_out":
-            value = float(self._query("VOUT1?"))
+            value = float(self._query("VOUT1?")) #actual output voltage
         elif key_internal == "current_out":
-            value = float(self._query("IOUT1?"))
+            value = float(self._query("IOUT1?")) #actual output current
         elif key_internal == "status":
             value = self._query_raw("STATUS?")
         elif key_internal == "idn":
             value = self._query("*IDN?")
+        elif key_internal == "power_out":
+            value = float(self._query("POWER?"))
+        elif key_internal == "analog_control":
+            value = self._query("ANALOGE?")
+        elif key_internal == "ext_switch":
+            value = self._query("EXON?")
+        elif key_internal == "ext_compensation":
+            value = self._query("SENES?")
         else:
             raise NotImplementedError
         return value
@@ -83,6 +125,10 @@ class korad_ka3005p(Device):
             'current_out': 'CH1 actual output current',
             'status': 'power supply status byte',
             'idn': 'device identification string',
+            'power_out': 'output power reading',
+            'analog_control': 'status of external analog control',
+            'ext_switch': 'status of external switch',
+            'ext_compensation': 'status of external voltage sense compensation',
         }
 
     def _connect(self):
@@ -140,8 +186,13 @@ if __name__ == "__main__":
     print(dev.read_probes("status"))
     dev.update({"voltage": 5.0, "current": 0.5})
     dev.update({"output_enable": True})
+    #for target_voltage in [5.0, 6.0, 7.0, 8.0]: #for setting multiple voltages
+        #dev.update({'voltage': target_voltage})
+        #time.sleep(1)
+        #print(dev.read_probes("voltage_set"))
     print(dev.read_probes("voltage_set"))
     print(dev.read_probes("current_set"))
     print(dev.read_probes("voltage_out"))
     print(dev.read_probes("current_out"))
+    print(dev.read_probes("power_out"))
     dev.close()
