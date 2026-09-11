@@ -5,6 +5,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.core import Device, Parameter
 import serial
 import time
+import matplotlib as plt
 
 
 class korad_ka3005p(Device):
@@ -184,16 +185,39 @@ if __name__ == "__main__":
     dev = korad_ka3005p()
     print(dev.read_probes("idn"))
     print(dev.read_probes("status"))
-    dev.update({"voltage": 5.0, "current": 0.5})
+    #dev.update({"voltage": 5.0, "current": 0.5})
     dev.update({"output_enable": True})
-    #for target_voltage in [5.0, 6.0, 7.0, 8.0]: #for setting multiple voltages
-        #dev.update({'voltage': target_voltage})
-        #time.sleep(1)
-        #print(dev.read_probes("voltage_set"))
-    print("Voltage Set:", dev.read_probes("voltage_set"))
-    print("Current Set:", dev.read_probes("current_set"))
-    print("Voltage Output:", dev.read_probes("voltage_out"))
-    print("Current Output:", dev.read_probes("current_out"))
-    print("Power Output:", dev.read_probes("power_out"))
-    time.sleep(10)
+
+    #graphing IV
+    dev.update({"current": 0.5})
+    voltages = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0,
+                5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0]
+    measured_voltages = []
+    measured_currents = []
+
+    for target_voltage in voltages:
+        dev.update({'voltage': target_voltage})
+        time.sleep(0.5)
+        v_out = dev.read_probes("voltage_out")
+        i_out = dev.read_probes("current_out")
+        measured_voltages.append(v_out)
+        measured_currents.append(i_out)
+        print(f"Measured: {v_out:.2f}V, {i_out:.3f}A")
     dev.close()
+
+    plt.figure()
+    plt.plot(measured_voltages, measured_currents)
+    plt.xlabel("Voltage (V)")
+    plt.ylabel("Current (A)")
+    plt.title("I-V Graph")
+    plt.grid(True)
+    plt.show()
+
+
+    #print("Voltage Set:", dev.read_probes("voltage_set"))
+    #print("Current Set:", dev.read_probes("current_set"))
+    #print("Voltage Output:", dev.read_probes("voltage_out"))
+    #print("Current Output:", dev.read_probes("current_out"))
+    #print("Power Output:", dev.read_probes("power_out"))
+    #time.sleep(10)
+    #dev.close()
