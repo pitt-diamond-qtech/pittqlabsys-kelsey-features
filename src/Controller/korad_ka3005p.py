@@ -187,6 +187,9 @@ Vt = 0.026
 def shockley_equation(Vd, Is, n, Vt=Vt):
     return Is * (np.exp(Vd / (n * Vt)) - 1)
 
+def linear_fit (I, R):
+    return I * R
+
 if __name__ == "__main__":
     dev = korad_ka3005p()
     print(dev.read_probes("idn"))
@@ -197,9 +200,10 @@ if __name__ == "__main__":
     #graphing IV
     dev.update({"current": 0.5})
 
-    low_voltages = [1.0, 1.5, 2.0, 2.5, 2.8]
-    high_voltages = list(np.round(np.arange(2.8, 10, 0.05), 2))
-    voltages = low_voltages + high_voltages
+    #low_voltages = [1.0, 1.5, 2.0, 2.5,]
+    #high_voltages = [float(v) for v in np.round(np.arange(2.6, 10, 0.05), 2)]
+    #voltages = low_voltages + high_voltages
+    voltages = [float(v) for v in np.round(np.arange(0.0, 5.0, 0.1), 2)]
     set_voltages = []
     measured_currents = []
     voltage_drop = []
@@ -209,33 +213,60 @@ if __name__ == "__main__":
         time.sleep(0.5)
         vdd_out = dev.read_probes("voltage_out")
         i_out = dev.read_probes("current_out")
-        vd_calculated = vdd_out - i_out*R
+        #vd_calculated = vdd_out - i_out*R
         set_voltages.append(vdd_out)
         measured_currents.append(i_out)
-        voltage_drop.append(vd_calculated)
-        print(f"Measured: {vdd_out:.2f}V, {i_out:.3f}A\nCalculated V_D: {vd_calculated}")  
+        #voltage_drop.append(vd_calculated)
+        # print(f"Measured: {vdd_out:.2f}V, {i_out:.3f}A\nCalculated V_D: {vd_calculated}")
+        print(f"Measured: {vdd_out:.2f}V, {i_out:.9f}A")
     dev.close()
 
-    Vd = np.array(voltage_drop)
+    Vdd = np.array(set_voltages)
     I = np.array(measured_currents)
-    p0 = [1e-9, 1.5]
-    popt, pcov = curve_fit(shockley_equation, Vd, I, p0=p0,
-    bounds=([1e-15, 0.5], [1e-3, 10]), maxfev=10000)
-    Is_fit, n_fit = popt
-    perr = np.sqrt(np.diag(pcov))
-    print(f"Fitted Is = {Is_fit:.3e} A  (+/- {perr[0]:.1e})")
-    print(f"Fitted n  = {n_fit:.3f}     (+/- {perr[1]:.3f})")
-    Vd_fit = np.linspace(min(Vd), max(Vd), 200)
-    I_fit = shockley_equation(Vd_fit, *popt)
+    popt, pcov = curve_fit(linear_fit, I, Vdd)
+    R_fit = popt[0]    
+    I_fit = np.linspace(min(I), max(I), 200)
+    Vdd_fit = linear_fit(I_fit, R_fit)
+    print(f"Resistance: {R_fit}")
     plt.figure()
-    plt.plot(Vd, I, label="Measured (Vd, I)")
-    plt.plot(Vd_fit, I_fit, label="Shockley Fitted (Vd, I)")
-    plt.xlabel("Diode Voltage V_D (V)")
+    plt.plot(Vdd, I)
+    plt.plot(Vdd_fit, I_fit)
+    plt.xlabel("Voltage V_DD (V)")
     plt.ylabel("Current (A)")
-    plt.title("Diode I-V Graph")
+    plt.title("I-V Graph")
     plt.grid(True)
     plt.show()
 
+
+    # Diode Fitting Plot
+    # Vd = np.array(voltage_drop)
+    # I = np.array(measured_currents)
+    # p0 = [1e-9, 1.5]
+    # popt, pcov = curve_fit(shockley_equation, Vd, I, p0=p0,
+    # bounds=([1e-15, 0.5], [1e-3, 10]), maxfev=10000)
+    # Is_fit, n_fit = popt
+    # perr = np.sqrt(np.diag(pcov))
+    # print(f"Fitted Is = {Is_fit:.3e} A  (+/- {perr[0]:.1e})")
+    # print(f"Fitted n  = {n_fit:.3f}     (+/- {perr[1]:.3f})")
+    # Vd_fit = np.linspace(min(Vd), max(Vd), 200)
+    # I_fit = shockley_equation(Vd_fit, *popt)
+    # plt.figure()
+    # plt.plot(Vd, I, label="Measured (Vd, I)")
+    # plt.plot(Vd_fit, I_fit, label="Shockley Fitted (Vd, I)")
+    # plt.xlabel("Diode Voltage V_D (V)")
+    # plt.ylabel("Current (A)")
+    # plt.title("Diode I-V Graph")
+    # plt.grid(True)
+    # plt.show()
+
+    #Resistance Fitting Plot
+    # plt.figure()
+    # plt.plot(set_voltages, measured_currents)
+    # plt.xlabel("Voltage V_DD (V)")
+    # plt.ylabel("Current (A)")
+    # plt.title("I-V Graph")
+    # plt.grid(True)
+    # plt.show()
 
     #print("Voltage Set:", dev.read_probes("voltage_set"))
     #print("Current Set:", dev.read_probes("current_set"))
