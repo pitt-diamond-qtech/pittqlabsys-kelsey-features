@@ -183,11 +183,9 @@ class korad_ka3005p(Device):
         print('korad_ka3005p closed')
 
 R = 220
-Vt = 26
+Vt = 0.026
 def shockley_equation(Vd, Is, n, Vt=Vt):
     return Is * (np.exp(Vd / (n * Vt)) - 1)
-
-
 
 if __name__ == "__main__":
     dev = korad_ka3005p()
@@ -198,8 +196,10 @@ if __name__ == "__main__":
 
     #graphing IV
     dev.update({"current": 0.5})
-    voltages = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0,
-                5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0]
+
+    low_voltages = [1.0, 1.5, 2.0, 2.5, 2.8]
+    high_voltages = list(np.round(np.arange(2.8, 10, 0.05), 2))
+    voltages = low_voltages + high_voltages
     set_voltages = []
     measured_currents = []
     voltage_drop = []
