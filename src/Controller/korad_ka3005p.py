@@ -5,7 +5,9 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.core import Device, Parameter
 import serial
 import time
-import matplotlib as plt
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy.optimize import curve_fit
 
 
 class korad_ka3005p(Device):
@@ -180,6 +182,12 @@ class korad_ka3005p(Device):
         self.ser.close()
         print('korad_ka3005p closed')
 
+R = 220
+Vt = 26
+def shockley_equation(Vd, Is, n, Vt=Vt):
+    return Is * (np.exp(Vd / (n * Vt)) - 1)
+
+
 
 if __name__ == "__main__":
     dev = korad_ka3005p()
@@ -192,21 +200,35 @@ if __name__ == "__main__":
     dev.update({"current": 0.5})
     voltages = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0,
                 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0]
-    measured_voltages = []
+    set_voltages = []
     measured_currents = []
+    voltage_drop = []
 
     for target_voltage in voltages:
         dev.update({'voltage': target_voltage})
         time.sleep(0.5)
-        v_out = dev.read_probes("voltage_out")
+        vdd_out = dev.read_probes("voltage_out")
         i_out = dev.read_probes("current_out")
-        measured_voltages.append(v_out)
+        vd_calculated = vdd_out - i_out*R
+        set_voltages.append(vdd_out)
         measured_currents.append(i_out)
-        print(f"Measured: {v_out:.2f}V, {i_out:.3f}A")
+        voltage_drop.append(vd_calculated)
+        print(f"Measured: {vdd_out:.2f}V, {i_out:.3f}A\nCalculated V_D: {vd_calculated}")  
     dev.close()
 
+    Vd = np.array(voltage_drop)
+    I = np.array(measured_currents)
+    p0 = [1e-9, 1.5]
+    popt, pcov = curve_fit(shockley_equation, Vd, I, p0=p0,
+    bounds=([1e-15, 0.5], [1e-3, 10]), maxfev=10000)
+    Is_fit, n_fit = popt
+    perr = np.sqrt(np.diag(pcov))
+    print(f"Fitted Is = {Is_fit:.3e} A  (+/- {perr[0]:.1e})")
+    print(f"Fitted n  = {n_fit:.3f}     (+/- {perr[1]:.3f})")
+    Vd_fit = np.linspace(min(Vd), max(Vd), 200)
+    I_fit = shockley_equation(Vd_fit, *popt)
     plt.figure()
-    plt.plot(measured_voltages, measured_currents)
+    plt.plot(set_voltages, measured_currents)
     plt.xlabel("Voltage (V)")
     plt.ylabel("Current (A)")
     plt.title("I-V Graph")
