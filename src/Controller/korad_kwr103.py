@@ -33,9 +33,6 @@ class korad_kwr103(Device):
         except Exception as e:
             raise e
 
-    def _id_str(self):
-        return "%02d" % int(self.settings['device_id'])
-
     def update(self, settings: dict):
         super(korad_kwr103, self).update(settings)
         for key, value in settings.items():
@@ -43,23 +40,22 @@ class korad_kwr103(Device):
                 value = int(value)
             key = self._param_to_internal(key)
             if self._settings_initialized:
-                idn = self._id_str()
                 if key == "voltage":
-                    self._send_command("VSET%s:%.2f" % (idn, float(value)))
+                    self._send_command("VSET:%.2f" % float(value))
                 elif key == "current":
-                    self._send_command("ISET%s:%.3f" % (idn, float(value)))
+                    self._send_command("ISET:%.3f" % float(value))
                 elif key == "output_enable":
-                    self._send_command("OUT%s:%d" % (idn, int(value)))
+                    self._send_command("OUT:%d" % int(value))
                 elif key == "beep":
-                    self._send_command("BEEP%s:%d" % (idn, int(value)))
+                    self._send_command("BEEP:%d" % int(value))
                 elif key == "ocp_enable":
-                    self._send_command("OCP%s:%s" % (idn, "ON" if int(value) else "OFF"))
+                    self._send_command("OCP:%s" % ("ON" if int(value) else "OFF"))
                 elif key == "ocp_value":
-                    self._send_command("OCP%s:%.2f" % (idn, float(value)))
+                    self._send_command("OCP:%.2f" % float(value))
                 elif key == "ovp_enable":
-                    self._send_command("OVP%s:%s" % (idn, "ON" if int(value) else "OFF"))
+                    self._send_command("OVP:%s" % ("ON" if int(value) else "OFF"))
                 elif key == "ovp_value":
-                    self._send_command("OVP%s:%.2f" % (idn, float(value)))
+                    self._send_command("OVP:%.2f" % float(value))
                 elif key == "recall_memory":
                     if not (1 <= int(value) <= 6):
                         raise ValueError("Memory slot must be 1-5, or 6 for LIST dynamic value")
@@ -67,7 +63,7 @@ class korad_kwr103(Device):
                 elif key == "save_memory":
                     if not (1 <= int(value) <= 5):
                         raise ValueError("Memory slot must be 1-5")
-                    self._send_command("SAV%s:%d" % (idn, int(value)))
+                    self._send_command("SAV:%d" % int(value))
                 elif key in ("ip", "port", "device_id", "timeout"):
                     pass
                 else:
@@ -80,25 +76,24 @@ class korad_kwr103(Device):
         assert (self._settings_initialized)
         assert key in list(self._PROBES.keys())
         key_internal = self._param_to_internal(key)
-        idn = self._id_str()
         if key_internal == "voltage_set":
-            value = float(self._query("VSET%s?" % idn))
+            value = float(self._query("VSET?"))
         elif key_internal == "current_set":
-            value = float(self._query("ISET%s?" % idn))
+            value = float(self._query("ISET?"))
         elif key_internal == "voltage_out":
-            value = float(self._query("VOUT%s?" % idn))
+            value = float(self._query("VOUT?"))
         elif key_internal == "current_out":
-            value = float(self._query("IOUT%s?" % idn))
+            value = float(self._query("IOUT?"))
         elif key_internal == "output_status":
-            value = self._query("OUT%s?" % idn)
+            value = self._query("OUT?")
         elif key_internal == "status":
-            value = self._query("STATUS%s?" % idn)
+            value = self._query("STATUS?")
         elif key_internal == "idn":
-            value = self._query("*IDN%s?" % idn)
+            value = self._query("*IDN?")
         elif key_internal == "ocp_value":
-            value = float(self._query("OCP%s?" % idn))
+            value = float(self._query("OCP?"))
         elif key_internal == "ovp_value":
-            value = float(self._query("OVP%s?" % idn))
+            value = float(self._query("OVP?"))
         else:
             raise NotImplementedError
         return value
@@ -138,20 +133,50 @@ class korad_kwr103(Device):
         return data.decode('ascii', errors='ignore').strip()
 
     def close(self):
-        idn = self._id_str()
-        self._send_command("OUT%s:0" % idn)
+        self._send_command("OUT:0")
         self.sock.close()
         print('korad_kwr103 closed')
 
 
 if __name__ == "__main__":
     dev = korad_kwr103()
-    print(dev.read_probes("idn"))
     print(dev.read_probes("status"))
-    dev.update({"voltage": 5.0, "current": 0.5})
+    # dev.update({"voltage": 5.0, "current": 0.5})
     dev.update({"output_enable": True})
-    print(dev.read_probes("voltage_set"))
-    print(dev.read_probes("current_set"))
+    # print(dev.read_probes("voltage_set"))
+    # print(dev.read_probes("current_set"))
     print(dev.read_probes("voltage_out"))
-    print(dev.read_probes("current_out"))
+    # print(dev.read_probes("current_out"))
     dev.close()
+
+
+
+# import serial
+# import time
+# COM_PORT = "COM7"
+# BAUD = 9600
+# ser =  serial.Serial(port=COM_PORT, baudrate=BAUD, timeout=1.0, bytesize=8, parity='N', stopbits=1)
+
+# def send(cmd):
+#     ser.write((cmd + "\n").encode('ascii'))
+#     time.sleep(0.2)
+
+# def query(cmd):
+#     send(cmd)
+#     return ser.read(ser.in_waiting or 1).decode('ascii', errors='ignore').strip()
+
+# print("IDN:", query("*IDN?"))
+# send(":SYSTem:IPADdress 192.168.2.110")
+# print("IP set to:", query(":SYSTem:IPADdress?"))
+# send(":SYSTem:SMASK 255.255.255.0")
+# print("Subnet set to:", query(":SYSTem:SMASK?"))
+# send(":SYSTem:GATEway 192.168.2.1")
+# print("Gateway set to:", query(":SYSTem:GATEway?"))
+# send(":SYSTem:PORT 41000")
+# print("Port:", query(":SYSTem:PORT?"))
+# print("VSET? ", repr(query("VSET?")))
+# print("VSET01?", repr(query("VSET01?")))
+# print("STATUS?", repr(query("STATUS?")))
+# print("STATUS01?", repr(query("STATUS01?")))
+# print("OUT?", repr(query("OUT?")))
+# print("OUT01?", repr(query("OUT01?")))
